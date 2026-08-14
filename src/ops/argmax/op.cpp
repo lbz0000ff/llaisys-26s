@@ -1,7 +1,32 @@
 #include "op.hpp"
 
+#include "../../core/llaisys_core.hpp"
+#include "../../utils.hpp"
+#include "../common/cpu/cpu_kernels.hpp"
+
 namespace llaisys::ops {
 void argmax(tensor_t max_idx, tensor_t max_val, tensor_t vals) {
-    TO_BE_IMPLEMENTED();
+    CHECK_SAME_DEVICE(max_idx, max_val, vals);
+    CHECK_ARGUMENT(vals->ndim() == 1 && vals->numel() > 0, "argmax input must be a non-empty 1D tensor");
+    CHECK_ARGUMENT(max_idx->shape() == std::vector<size_t>{1} && max_val->shape() == std::vector<size_t>{1},
+                   "argmax outputs must have shape [1]");
+    CHECK_ARGUMENT(max_idx->dtype() == LLAISYS_DTYPE_I64, "argmax index output must use int64");
+    CHECK_SAME_DTYPE(max_val->dtype(), vals->dtype());
+    ASSERT(max_idx->isContiguous() && max_val->isContiguous() && vals->isContiguous(),
+           "Argmax: all tensors must be contiguous.");
+
+    if (vals->deviceType() == LLAISYS_DEVICE_CPU) {
+        return cpu::argmax(max_idx->data(), max_val->data(), vals->data(), vals->dtype(), vals->numel());
+    }
+    core::context().setDevice(vals->deviceType(), vals->deviceId());
+    switch (vals->deviceType()) {
+#ifdef ENABLE_NVIDIA_API
+    case LLAISYS_DEVICE_NVIDIA:
+        TO_BE_IMPLEMENTED();
+        return;
+#endif
+    default:
+        EXCEPTION_UNSUPPORTED_DEVICE;
+    }
 }
 } // namespace llaisys::ops
