@@ -1,5 +1,5 @@
 import json
-from ctypes import c_int, c_size_t, c_void_p
+from ctypes import c_int, c_int64, c_size_t, c_void_p
 from pathlib import Path
 from typing import Sequence
 
@@ -131,5 +131,35 @@ class Qwen2:
         top_p: float = 0.8,
         temperature: float = 0.8,
     ):
+        tokens = [int(token) for token in inputs]
+        if not tokens:
+            raise ValueError("inputs must contain at least one token")
+        if max_new_tokens is None:
+            max_new_tokens = self._meta.maxseq - len(tokens)
+        if max_new_tokens < 0:
+            raise ValueError("max_new_tokens must be non-negative")
+        if top_k != 1:
+            raise ValueError("LLAISYS currently supports greedy decoding only (top_k=1)")
+        if len(tokens) + max_new_tokens > self._meta.maxseq:
+            raise ValueError("requested sequence exceeds max_position_embeddings")
 
-        raise NotImplementedError("Qwen2 generation is implemented in the next assignment stage")
+        # Greedy decoding is deterministic, so top_p and temperature do not
+        # affect the selected token when top_k is one.
+        del top_p, temperature
+        LIB_LLAISYS.llaisysQwen2ModelReset(self._model)
+
+        output = list(tokens)
+        step_input = tokens
+        for _ in range(max_new_tokens):
+            token_array = (c_int64 * len(step_input))(*step_input)
+            next_token = int(
+                LIB_LLAISYS.llaisysQwen2ModelInfer(
+                    self._model, token_array, len(step_input)
+                )
+            )
+            output.append(next_token)
+            if next_token == self._meta.end_token:
+                break
+            step_input = [next_token]
+
+        return output
