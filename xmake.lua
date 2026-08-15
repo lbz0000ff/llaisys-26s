@@ -18,6 +18,18 @@ if has_config("nv-gpu") then
     includes("xmake/nvidia.lua")
 end
 
+-- Moore Threads MUSA --
+option("musa-gpu")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Whether to compile implementations for Moore Threads MUSA GPU")
+option_end()
+
+if has_config("musa-gpu") then
+    add_defines("ENABLE_MUSA_API")
+    includes("xmake/musa.lua")
+end
+
 target("llaisys-utils")
     set_kind("static")
 
@@ -39,6 +51,9 @@ target("llaisys-device")
     add_deps("llaisys-device-cpu")
     if has_config("nv-gpu") then
         add_deps("llaisys-device-nvidia")
+    end
+    if has_config("musa-gpu") then
+        add_deps("llaisys-device-musa")
     end
 
     set_languages("cxx17")
@@ -89,6 +104,9 @@ target("llaisys-ops")
     if has_config("nv-gpu") then
         add_deps("llaisys-ops-nvidia")
     end
+    if has_config("musa-gpu") then
+        add_deps("llaisys-ops-musa")
+    end
 
     set_languages("cxx17")
     set_warnings("all", "error")
@@ -125,6 +143,9 @@ target("llaisys")
     add_deps("llaisys-tensor")
     add_deps("llaisys-ops")
     add_deps("llaisys-models")
+    if has_config("musa-gpu") then
+        add_rpathdirs("/usr/local/musa/lib")
+    end
 
     set_languages("cxx17")
     set_warnings("all", "error")
