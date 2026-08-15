@@ -5,11 +5,13 @@
 #include "../../ops/argmax/op.hpp"
 #include "../../ops/embedding/op.hpp"
 #include "../../ops/linear/op.hpp"
+#include "../../ops/rearrange/op.hpp"
 #include "../../ops/rms_norm/op.hpp"
 #include "../../ops/rope/op.hpp"
 #include "../../ops/self_attention/op.hpp"
 #include "../../ops/swiglu/op.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
@@ -76,17 +78,29 @@ size_t Qwen2Model::loadedWeightCount() const {
     return _loaded_weights.size();
 }
 
+size_t Qwen2Model::cachedTokenCount() const {
+    return _cached_tokens;
+}
+
+void Qwen2Model::reset() {
+    _cached_tokens = 0;
+}
+
 int64_t Qwen2Model::infer(const int64_t *token_ids, size_t ntoken) {
     CHECK_ARGUMENT(_device == LLAISYS_DEVICE_CPU, "Qwen2 prefill currently supports CPU only");
     CHECK_ARGUMENT(token_ids != nullptr, "Qwen2 token input must not be null");
-    CHECK_ARGUMENT(ntoken > 0 && ntoken <= _meta.maxseq, "invalid Qwen2 input sequence length");
+    CHECK_ARGUMENT(ntoken > 0 && ntoken <= _meta.maxseq - _cached_tokens, "invalid Qwen2 input sequence length");
     CHECK_ARGUMENT(loadedWeightCount() == expectedWeightCount(), "Qwen2 weights are not fully loaded");
+
+    const size_t cache_start = _cached_tokens;
+    const size_t total_tokens = cache_start + ntoken;
+    ensureCacheCapacity(total_tokens);
 
     tensor_t token_tensor = Tensor::create({ntoken}, LLAISYS_DTYPE_I64, _device, _device_id);
     token_tensor->load(token_ids);
     tensor_t position_ids = Tensor::create({ntoken}, LLAISYS_DTYPE_I64, _device, _device_id);
     std::vector<int64_t> positions(ntoken);
-    std::iota(positions.begin(), positions.end(), int64_t{0});
+    std::iota(positions.begin(), positions.end(), static_cast<int64_t>(cache_start));
     position_ids->load(positions.data());
 
     tensor_t hidden = Tensor::create({ntoken, _meta.hs}, _meta.dtype, _device, _device_id);
@@ -115,8 +129,15 @@ int64_t Qwen2Model::infer(const int64_t *token_ids, size_t ntoken) {
         ops::rope(rotated_q, q, position_ids, _meta.theta);
         ops::rope(rotated_k, k, position_ids, _meta.theta);
 
+        tensor_t key_destination = _key_cache[layer]->slice(0, cache_start, total_tokens);
+        tensor_t value_destination = _value_cache[layer]->slice(0, cache_start, total_tokens);
+        ops::rearrange(key_destination, rotated_k);
+        ops::rearrange(value_destination, v);
+        tensor_t cached_keys = _key_cache[layer]->slice(0, 0, total_tokens);
+        tensor_t cached_values = _value_cache[layer]->slice(0, 0, total_tokens);
+
         tensor_t attention = Tensor::create({ntoken, _meta.nh, _meta.dh}, _meta.dtype, _device, _device_id);
-        ops::self_attention(attention, rotated_q, rotated_k, v, attention_scale);
+        ops::self_attention(attention, rotated_q, cached_keys, cached_values, attention_scale);
         tensor_t attention_flat = attention->view({ntoken, _meta.hs});
         tensor_t attention_out = Tensor::create({ntoken, _meta.hs}, _meta.dtype, _device, _device_id);
         ops::linear(attention_out, attention_flat, _weights.attn_o_w[layer], nullptr);
@@ -148,6 +169,7 @@ int64_t Qwen2Model::infer(const int64_t *token_ids, size_t ntoken) {
     tensor_t max_index = Tensor::create({1}, LLAISYS_DTYPE_I64, _device, _device_id);
     tensor_t max_value = Tensor::create({1}, _meta.dtype, _device, _device_id);
     ops::argmax(max_index, max_value, logits->view({_meta.voc}));
+    _cached_tokens = total_tokens;
     return *reinterpret_cast<const int64_t *>(max_index->data());
 }
 
@@ -193,6 +215,39 @@ tensor_t Qwen2Model::createWeight(const std::string &name, const std::vector<siz
         throw std::logic_error("duplicate Qwen2 weight name: " + name);
     }
     return tensor;
+}
+
+void Qwen2Model::ensureCacheCapacity(size_t required_tokens) {
+    if (required_tokens <= _cache_capacity) {
+        return;
+    }
+
+    size_t new_capacity = _cache_capacity == 0
+                            ? std::min(_meta.maxseq, std::max<size_t>(128, required_tokens))
+                            : _cache_capacity;
+    while (new_capacity < required_tokens) {
+        new_capacity = std::min(_meta.maxseq, new_capacity * 2);
+    }
+
+    std::vector<tensor_t> new_key_cache(_meta.nlayer);
+    std::vector<tensor_t> new_value_cache(_meta.nlayer);
+    for (size_t layer = 0; layer < _meta.nlayer; ++layer) {
+        new_key_cache[layer] = Tensor::create(
+            {new_capacity, _meta.nkvh, _meta.dh}, _meta.dtype, _device, _device_id);
+        new_value_cache[layer] = Tensor::create(
+            {new_capacity, _meta.nkvh, _meta.dh}, _meta.dtype, _device, _device_id);
+        if (_cached_tokens > 0) {
+            tensor_t old_keys = _key_cache[layer]->slice(0, 0, _cached_tokens);
+            tensor_t old_values = _value_cache[layer]->slice(0, 0, _cached_tokens);
+            tensor_t new_keys = new_key_cache[layer]->slice(0, 0, _cached_tokens);
+            tensor_t new_values = new_value_cache[layer]->slice(0, 0, _cached_tokens);
+            ops::rearrange(new_keys, old_keys);
+            ops::rearrange(new_values, old_values);
+        }
+    }
+    _key_cache = std::move(new_key_cache);
+    _value_cache = std::move(new_value_cache);
+    _cache_capacity = new_capacity;
 }
 
 } // namespace llaisys::models

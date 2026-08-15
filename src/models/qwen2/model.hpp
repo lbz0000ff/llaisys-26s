@@ -36,6 +36,8 @@ public:
     const Qwen2Weights &weights() const;
     size_t expectedWeightCount() const;
     size_t loadedWeightCount() const;
+    size_t cachedTokenCount() const;
+    void reset();
     int64_t infer(const int64_t *token_ids, size_t ntoken);
     llaisysQwen2WeightLoadStatus_t loadWeight(
         const std::string &name,
@@ -46,6 +48,7 @@ public:
 
 private:
     tensor_t createWeight(const std::string &name, const std::vector<size_t> &shape);
+    void ensureCacheCapacity(size_t required_tokens);
 
     LlaisysQwen2Meta _meta;
     llaisysDeviceType_t _device;
@@ -53,6 +56,10 @@ private:
     Qwen2Weights _weights;
     std::unordered_map<std::string, tensor_t> _weights_by_name;
     std::unordered_set<std::string> _loaded_weights;
+    std::vector<tensor_t> _key_cache;
+    std::vector<tensor_t> _value_cache;
+    size_t _cache_capacity = 0;
+    size_t _cached_tokens = 0;
 };
 
 } // namespace llaisys::models

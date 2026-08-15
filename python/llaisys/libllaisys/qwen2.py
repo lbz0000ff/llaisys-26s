@@ -61,6 +61,12 @@ def load_qwen2(lib):
     lib.llaisysQwen2ModelLoadedWeightCount.argtypes = [llaisysQwen2Model_t]
     lib.llaisysQwen2ModelLoadedWeightCount.restype = c_size_t
 
+    lib.llaisysQwen2ModelCachedTokenCount.argtypes = [llaisysQwen2Model_t]
+    lib.llaisysQwen2ModelCachedTokenCount.restype = c_size_t
+
+    lib.llaisysQwen2ModelReset.argtypes = [llaisysQwen2Model_t]
+    lib.llaisysQwen2ModelReset.restype = None
+
     lib.llaisysQwen2ModelInfer.argtypes = [
         llaisysQwen2Model_t,
         POINTER(c_int64),

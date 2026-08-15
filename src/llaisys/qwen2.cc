@@ -109,6 +109,16 @@ size_t llaisysQwen2ModelLoadedWeightCount(const LlaisysQwen2Model *model) {
     return model == nullptr ? 0 : model->model->loadedWeightCount();
 }
 
+size_t llaisysQwen2ModelCachedTokenCount(const LlaisysQwen2Model *model) {
+    return model == nullptr ? 0 : model->model->cachedTokenCount();
+}
+
+void llaisysQwen2ModelReset(LlaisysQwen2Model *model) {
+    if (model != nullptr) {
+        model->model->reset();
+    }
+}
+
 int64_t llaisysQwen2ModelInfer(LlaisysQwen2Model *model, int64_t *token_ids, size_t ntoken) {
     if (model == nullptr) {
         return -1;
