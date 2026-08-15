@@ -87,7 +87,6 @@ void Qwen2Model::reset() {
 }
 
 int64_t Qwen2Model::infer(const int64_t *token_ids, size_t ntoken) {
-    CHECK_ARGUMENT(_device == LLAISYS_DEVICE_CPU, "Qwen2 prefill currently supports CPU only");
     CHECK_ARGUMENT(token_ids != nullptr, "Qwen2 token input must not be null");
     CHECK_ARGUMENT(ntoken > 0 && ntoken <= _meta.maxseq - _cached_tokens, "invalid Qwen2 input sequence length");
     CHECK_ARGUMENT(loadedWeightCount() == expectedWeightCount(), "Qwen2 weights are not fully loaded");
@@ -170,7 +169,14 @@ int64_t Qwen2Model::infer(const int64_t *token_ids, size_t ntoken) {
     tensor_t max_value = Tensor::create({1}, _meta.dtype, _device, _device_id);
     ops::argmax(max_index, max_value, logits->view({_meta.voc}));
     _cached_tokens = total_tokens;
-    return *reinterpret_cast<const int64_t *>(max_index->data());
+    int64_t result = 0;
+    core::context().setDevice(_device, _device_id);
+    core::context().runtime().api()->memcpy_sync(
+        &result,
+        max_index->data(),
+        sizeof(result),
+        LLAISYS_MEMCPY_D2H);
+    return result;
 }
 
 llaisysQwen2WeightLoadStatus_t Qwen2Model::loadWeight(
