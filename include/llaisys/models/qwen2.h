@@ -31,11 +31,32 @@ __C {
 
     struct LlaisysQwen2Model;
 
+    typedef enum {
+        LLAISYS_QWEN2_WEIGHT_LOAD_SUCCESS = 0,
+        LLAISYS_QWEN2_WEIGHT_LOAD_INVALID_ARGUMENT = 1,
+        LLAISYS_QWEN2_WEIGHT_LOAD_UNKNOWN_NAME = 2,
+        LLAISYS_QWEN2_WEIGHT_LOAD_DTYPE_MISMATCH = 3,
+        LLAISYS_QWEN2_WEIGHT_LOAD_SHAPE_MISMATCH = 4,
+        LLAISYS_QWEN2_WEIGHT_LOAD_DUPLICATE = 5,
+    } llaisysQwen2WeightLoadStatus_t;
+
     __export struct LlaisysQwen2Model *llaisysQwen2ModelCreate(const LlaisysQwen2Meta *meta, llaisysDeviceType_t device, int *device_ids, int ndevice);
 
     __export void llaisysQwen2ModelDestroy(struct LlaisysQwen2Model * model);
 
     __export struct LlaisysQwen2Weights *llaisysQwen2ModelWeights(struct LlaisysQwen2Model * model);
+
+    __export llaisysQwen2WeightLoadStatus_t llaisysQwen2ModelLoadWeight(
+        struct LlaisysQwen2Model *model,
+        const char *name,
+        const void *data,
+        llaisysDataType_t dtype,
+        const size_t *shape,
+        size_t ndim);
+
+    __export size_t llaisysQwen2ModelExpectedWeightCount(const struct LlaisysQwen2Model *model);
+
+    __export size_t llaisysQwen2ModelLoadedWeightCount(const struct LlaisysQwen2Model *model);
 
     __export int64_t llaisysQwen2ModelInfer(struct LlaisysQwen2Model * model, int64_t * token_ids, size_t ntoken);
 }
