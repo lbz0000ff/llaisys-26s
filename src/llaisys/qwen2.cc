@@ -109,8 +109,11 @@ size_t llaisysQwen2ModelLoadedWeightCount(const LlaisysQwen2Model *model) {
     return model == nullptr ? 0 : model->model->loadedWeightCount();
 }
 
-int64_t llaisysQwen2ModelInfer(LlaisysQwen2Model *, int64_t *, size_t) {
-    return -1;
+int64_t llaisysQwen2ModelInfer(LlaisysQwen2Model *model, int64_t *token_ids, size_t ntoken) {
+    if (model == nullptr) {
+        return -1;
+    }
+    return model->model->infer(token_ids, ntoken);
 }
 
 } // extern "C"

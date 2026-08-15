@@ -36,6 +36,7 @@ public:
     const Qwen2Weights &weights() const;
     size_t expectedWeightCount() const;
     size_t loadedWeightCount() const;
+    int64_t infer(const int64_t *token_ids, size_t ntoken);
     llaisysQwen2WeightLoadStatus_t loadWeight(
         const std::string &name,
         const void *data,
