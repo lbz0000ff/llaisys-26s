@@ -6,6 +6,9 @@
 #ifdef ENABLE_NVIDIA_API
 #include "nvidia/rope_nvidia.cuh"
 #endif
+#ifdef ENABLE_MUSA_API
+#include "musa/rope_musa.cuh"
+#endif
 
 namespace llaisys::ops {
 void rope(tensor_t out, tensor_t in, tensor_t pos_ids, float theta) {
@@ -32,6 +35,11 @@ void rope(tensor_t out, tensor_t in, tensor_t pos_ids, float theta) {
 #ifdef ENABLE_NVIDIA_API
     case LLAISYS_DEVICE_NVIDIA:
         return nvidia::rope(out->data(), in->data(), pos_ids->data(), out->dtype(), in->shape()[0],
+                            in->shape()[1], in->shape()[2], theta);
+#endif
+#ifdef ENABLE_MUSA_API
+    case LLAISYS_DEVICE_MUSA:
+        return musa::rope(out->data(), in->data(), pos_ids->data(), out->dtype(), in->shape()[0],
                             in->shape()[1], in->shape()[2], theta);
 #endif
     default:

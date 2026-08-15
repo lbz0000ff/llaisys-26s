@@ -23,10 +23,14 @@ def load_hf_model(model_path=None, device_name="cpu"):
         print(f"Loading model from Hugging Face: {model_id}")
         model_path = snapshot_download(model_id)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    # torch_musa 1.3 requires an explicit SDPA scale, while the Qwen2
+    # implementation in supported Transformers releases leaves it implicit.
+    # Keep the reference model on CPU and compare its tokens with LLAISYS MUSA.
+    reference_device = "cpu" if device_name == "musa" else device_name
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.bfloat16,
-        device_map=torch_device(device_name),
+        device_map=torch_device(reference_device),
         trust_remote_code=True,
     )
 
@@ -81,7 +85,7 @@ def llaisys_infer(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", default="cpu", choices=["cpu", "nvidia"], type=str)
+    parser.add_argument("--device", default="cpu", choices=["cpu", "nvidia", "musa"], type=str)
     parser.add_argument("--model", default=None, type=str)
     parser.add_argument("--prompt", default="Who are you?", type=str)
     parser.add_argument("--max_steps", default=128, type=int)

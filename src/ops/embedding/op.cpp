@@ -6,6 +6,9 @@
 #ifdef ENABLE_NVIDIA_API
 #include "nvidia/embedding_nvidia.cuh"
 #endif
+#ifdef ENABLE_MUSA_API
+#include "musa/embedding_musa.cuh"
+#endif
 
 namespace llaisys::ops {
 void embedding(tensor_t out, tensor_t index, tensor_t weight) {
@@ -31,6 +34,11 @@ void embedding(tensor_t out, tensor_t index, tensor_t weight) {
 #ifdef ENABLE_NVIDIA_API
     case LLAISYS_DEVICE_NVIDIA:
         return nvidia::embedding(out->data(), index->data(), weight->data(), out->dtype(), index->numel(),
+                                 weight->shape()[1]);
+#endif
+#ifdef ENABLE_MUSA_API
+    case LLAISYS_DEVICE_MUSA:
+        return musa::embedding(out->data(), index->data(), weight->data(), out->dtype(), index->numel(),
                                  weight->shape()[1]);
 #endif
     default:

@@ -6,6 +6,9 @@
 #ifdef ENABLE_NVIDIA_API
 #include "nvidia/rearrange_nvidia.cuh"
 #endif
+#ifdef ENABLE_MUSA_API
+#include "musa/rearrange_musa.cuh"
+#endif
 
 namespace llaisys::ops {
 void rearrange(tensor_t out, tensor_t in) {
@@ -24,6 +27,10 @@ void rearrange(tensor_t out, tensor_t in) {
 #ifdef ENABLE_NVIDIA_API
     case LLAISYS_DEVICE_NVIDIA:
         return nvidia::rearrange(out->data(), in->data(), out->dtype(), in->shape(), in->strides());
+#endif
+#ifdef ENABLE_MUSA_API
+    case LLAISYS_DEVICE_MUSA:
+        return musa::rearrange(out->data(), in->data(), out->dtype(), in->shape(), in->strides());
 #endif
     default:
         EXCEPTION_UNSUPPORTED_DEVICE;

@@ -6,6 +6,9 @@
 #ifdef ENABLE_NVIDIA_API
 #include "nvidia/self_attention_nvidia.cuh"
 #endif
+#ifdef ENABLE_MUSA_API
+#include "musa/self_attention_musa.cuh"
+#endif
 
 namespace llaisys::ops {
 void self_attention(tensor_t attn_val, tensor_t q, tensor_t k, tensor_t v, float scale) {
@@ -38,6 +41,12 @@ void self_attention(tensor_t attn_val, tensor_t q, tensor_t k, tensor_t v, float
 #ifdef ENABLE_NVIDIA_API
     case LLAISYS_DEVICE_NVIDIA:
         return nvidia::selfAttention(attn_val->data(), q->data(), k->data(), v->data(), attn_val->dtype(),
+                                     q->shape()[0], k->shape()[0], q->shape()[1], k->shape()[1],
+                                     q->shape()[2], v->shape()[2], scale);
+#endif
+#ifdef ENABLE_MUSA_API
+    case LLAISYS_DEVICE_MUSA:
+        return musa::selfAttention(attn_val->data(), q->data(), k->data(), v->data(), attn_val->dtype(),
                                      q->shape()[0], k->shape()[0], q->shape()[1], k->shape()[1],
                                      q->shape()[2], v->shape()[2], scale);
 #endif
